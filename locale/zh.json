@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "口头禅",
+    "description": "把常说的话存起来，在右侧面板里点一下就能插入输入框；存放在 <DSH_HOME>/phrases.json，可增删改。",
+    "detail": "docs/DETAIL.md"
+  }
+}
