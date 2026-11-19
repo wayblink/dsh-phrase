@@ -2,6 +2,12 @@
 
 Canned phrases for DeepSeek Harness — save the lines you type often and insert them into the composer with one click.
 
+| English | 中文 |
+|---|---|
+| ![The Phrases panel in English](docs/images/panel-en.png) | ![口头禅面板](docs/images/panel-zh.png) |
+
+*The panel follows the GUI language; both screenshots come from the plugin's own component.*
+
 [中文说明](#中文说明)
 
 ## What it does
