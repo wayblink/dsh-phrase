@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Canned phrases",
-    "description": "Save the lines you type often and insert them into the composer with one click; stored in <DSH_HOME>/phrases.json and editable from the right-Sidebar panel.",
+    "description": "Save the lines you type often and insert them into the composer with one click; stored in <DSH_HOME>/dsh-phrase.json and editable from the right-Sidebar panel.",
     "detail": "docs/DETAIL.md"
   }
 }

@@ -1,13 +1,30 @@
 {
-  "name": "@wayblink/phrases-dsh",
+  "name": "dsh-phrase",
   "version": "0.1.0",
-  "description": "DeepSeek Harness bundle for canned phrases — save the lines you type often and insert them into the composer with one click",
+  "description": "DeepSeek Harness plugin for canned phrases: save the lines you type often and insert them into the composer with one click. Bilingual UI (English / 中文).",
   "license": "MIT",
   "type": "module",
-  "private": true,
-  "keywords": ["dsh-plugin", "dsh-bundle", "canned-responses", "snippets", "composer"],
+  "keywords": [
+    "dsh-plugin",
+    "dsh-bundle",
+    "deepseek-harness",
+    "canned-responses",
+    "snippets",
+    "phrases",
+    "composer"
+  ],
   "author": "wayblink",
-  "homepage": "https://github.com/wayblink/phrases-dsh#readme",
+  "homepage": "https://github.com/wayblink/dsh-phrase#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wayblink/dsh-phrase.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wayblink/dsh-phrase/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -22,7 +39,8 @@
     "locale/*.json",
     "docs",
     "icon.svg",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "dsh": ">=0.2.2-rc.1"

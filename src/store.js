@@ -72,7 +72,7 @@ export function makeId() {
 export function applyAction(state, action, clock = {}) {
   const current = normalizeState(state);
   if (action === null || typeof action !== "object") {
-    return { state: current, error: "请求格式不正确" };
+    return { state: current, error: "invalid_request" };
   }
   const kind = typeof action.action === "string" ? action.action : "";
   const id = typeof action.id === "string" ? action.id : "";
@@ -80,13 +80,13 @@ export function applyAction(state, action, clock = {}) {
 
   if (kind === "add") {
     const text = cleanText(action.text);
-    if (text === "") return { state: current, error: "内容不能为空" };
-    if (text.length > MAX_TEXT_LENGTH) return { state: current, error: `内容不能超过 ${MAX_TEXT_LENGTH} 个字符` };
+    if (text === "") return { state: current, error: "empty" };
+    if (text.length > MAX_TEXT_LENGTH) return { state: current, error: "too_long" };
     if (current.phrases.some((row) => row.text === text)) {
-      return { state: current, error: "这句已经存过了" };
+      return { state: current, error: "duplicate" };
     }
     if (current.phrases.length >= MAX_PHRASES) {
-      return { state: current, error: `最多保存 ${MAX_PHRASES} 条` };
+      return { state: current, error: "too_many" };
     }
     return {
       state: {
@@ -98,14 +98,14 @@ export function applyAction(state, action, clock = {}) {
 
   if (kind === "update") {
     const text = cleanText(action.text);
-    if (id === "") return { state: current, error: "缺少要修改的条目" };
-    if (text === "") return { state: current, error: "内容不能为空" };
-    if (text.length > MAX_TEXT_LENGTH) return { state: current, error: `内容不能超过 ${MAX_TEXT_LENGTH} 个字符` };
+    if (id === "") return { state: current, error: "invalid_request" };
+    if (text === "") return { state: current, error: "empty" };
+    if (text.length > MAX_TEXT_LENGTH) return { state: current, error: "too_long" };
     if (current.phrases.some((row) => row.id !== id && row.text === text)) {
-      return { state: current, error: "这句已经存过了" };
+      return { state: current, error: "duplicate" };
     }
     if (!current.phrases.some((row) => row.id === id)) {
-      return { state: current, error: "找不到这条口头禅" };
+      return { state: current, error: "not_found" };
     }
     return {
       state: {
@@ -116,14 +116,14 @@ export function applyAction(state, action, clock = {}) {
   }
 
   if (kind === "delete") {
-    if (id === "") return { state: current, error: "缺少要删除的条目" };
+    if (id === "") return { state: current, error: "invalid_request" };
     if (!current.phrases.some((row) => row.id === id)) {
-      return { state: current, error: "找不到这条口头禅" };
+      return { state: current, error: "not_found" };
     }
     return {
       state: { version: 1, phrases: current.phrases.filter((row) => row.id !== id) },
     };
   }
 
-  return { state: current, error: `未知操作: ${kind || "(空)"}` };
+  return { state: current, error: "unknown_action" };
 }

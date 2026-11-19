@@ -2,7 +2,7 @@
  * phrases — a DeepSeek Harness bundle for canned messages.
  *
  * The browser half never owns the data: the list lives in
- * `<DSH_HOME>/phrases.json`, and this half serves it and applies one mutation
+ * `<DSH_HOME>/dsh-phrase.json`, and this half serves it and applies one mutation
  * per request. One store, two routes, no model tool.
  *
  * Every write is validated by `src/store.js` before it touches the file, and
@@ -24,7 +24,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 
 /** @param {string} home */
 function storePathFor(home) {
-  return join(home, "phrases.json");
+  return join(home, "dsh-phrase.json");
 }
 
 /** @param {unknown} error */
@@ -48,7 +48,7 @@ export function apply(ctx) {
     try {
       return normalizeState(JSON.parse(raw));
     } catch {
-      throw new Error(`phrases.json 不是合法 JSON: ${file}`);
+      throw Object.assign(new Error("store_corrupt"), { code: "store_corrupt" });
     }
   };
 
@@ -78,7 +78,7 @@ export function apply(ctx) {
       request.on("data", (chunk) => {
         length += chunk.length;
         if (length > MAX_BODY_BYTES) {
-          reject(new Error("请求体过大"));
+          reject(Object.assign(new Error("too_large"), { code: "too_large" }));
           request.destroy();
           return;
         }
@@ -91,7 +91,7 @@ export function apply(ctx) {
   ctx.effect(() =>
     ctx.webServer.register({
       kind: "exact",
-      path: "/api/phrases",
+      path: "/api/dsh-phrase",
       handler: async (request, response) => {
         /** @param {number} status @param {unknown} value */
         const send = (status, value) => {
@@ -135,8 +135,8 @@ export function apply(ctx) {
             send(415, { error: "expected application/json" });
             return;
           }
-          if (request.headers["x-phrases-write"] !== "1") {
-            send(403, { error: "missing x-phrases-write header" });
+          if (request.headers["x-dsh-phrase-write"] !== "1") {
+            send(403, { error: "missing x-dsh-phrase-write header" });
             return;
           }
 
@@ -145,7 +145,7 @@ export function apply(ctx) {
           try {
             payload = JSON.parse(await readBody(request));
           } catch {
-            send(400, { error: "请求体不是合法 JSON" });
+            send(400, { error: "invalid_json" });
             return;
           }
 
@@ -162,7 +162,16 @@ export function apply(ctx) {
           }
           send(200, { phrases: result.state.phrases });
         } catch (error) {
-          send(500, { error: messageOf(error) });
+          const code = /** @type {any} */ (error)?.code;
+          if (code === "store_corrupt") {
+            send(500, { error: "store_corrupt", path: file });
+            return;
+          }
+          if (code === "too_large") {
+            send(400, { error: "too_large" });
+            return;
+          }
+          send(500, { error: "internal_error", detail: messageOf(error) });
         }
       },
     }),

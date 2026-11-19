@@ -1,22 +1,23 @@
 /**
- * Browser half of the phrases bundle.
+ * Browser half of dsh-phrase.
  *
- * One surface: a right-Sidebar "口头禅" tab. Clicking a row inserts that
- * phrase into the current Session's composer at the caret; the same panel adds,
- * edits and deletes the stored list. The composer chip is only a door to it.
+ * One surface: a right-Sidebar "Phrases" tab. Clicking a row inserts that line
+ * into the current Session's composer at the caret; the same panel adds, edits
+ * and deletes the stored list. The composer chip is only a door to it.
  *
- * The list itself lives on the Host (`<DSH_HOME>/phrases.json`); this module
- * reads and mutates it through `/api/phrases`, so the data survives restarts and
- * does not depend on a browser origin.
+ * The list lives on the Host (`<DSH_HOME>/dsh-phrase.json`); this module reads
+ * and mutates it through `/api/dsh-phrase`, so the data survives restarts and
+ * does not depend on a browser origin. Every visible string goes through the
+ * client locale service (`zh` and `en` are both registered below).
  */
 
 window.__ModuleLoader__.load({
-  id: "@wayblink/phrases-dsh",
+  id: "dsh-phrase",
   factory(require) {
     const React = require("react");
     const h = React.createElement;
     const { useCallback, useEffect, useState } = React;
-    /** Latest client context, for the chip's click handler. */
+    /** Latest client context, for the chip and the locale binding. */
     const ctxRef = { current: null };
 
     /** Host theme tokens, each with a neutral fallback so a rename degrades. */
@@ -29,15 +30,104 @@ window.__ModuleLoader__.load({
       layer1: "var(--dsw-alias-bg-layer-1, color-mix(in srgb, currentColor 4%, transparent))",
       card: "var(--dsw-alias-card-fill, color-mix(in srgb, currentColor 3%, transparent))",
       border1: "var(--dsw-alias-border-l1, color-mix(in srgb, currentColor 10%, transparent))",
-      border2: "var(--dsw-alias-border-l2, color-mix(in srgb, currentColor 16%, transparent))",
       accent: "var(--dsw-alias-brand-primary, color-mix(in srgb, currentColor 70%, transparent))",
       warn: "var(--dsw-alias-state-warn-primary, color-mix(in srgb, currentColor 55%, transparent))",
       danger: "var(--dsw-alias-state-error-primary, color-mix(in srgb, currentColor 80%, transparent))",
     };
 
-    const TAB_KIND = "phrases";
-    const TAB_ID = "@wayblink/phrases-dsh/panel";
+    const NS = "dsh-phrase";
+    const TAB_KIND = "dsh-phrase";
+    const TAB_ID = "dsh-phrase/panel";
     const HUE = "#0891b2";
+
+    /** UI copy. Both baseline locales are required by the locale service. */
+    const DICTS = {
+      zh: {
+        tabTitle: "口头禅",
+        guideTitle: "口头禅",
+        guideDescription: "常说的话，点击插入输入框",
+        chip: "口头禅",
+        title: "口头禅",
+        refresh: "刷新",
+        addPlaceholder: "新增一句常说的话，比如：收到，我马上看。",
+        addAria: "新增口头禅",
+        save: "保存",
+        cancel: "取消",
+        insert: "插入",
+        edit: "编辑",
+        delete: "删除",
+        confirmDelete: "确认删除",
+        hint: "点句子插入输入框；最多 100 条，每条 300 字",
+        loading: "读取中…",
+        empty: "还没有保存的口头禅。上面输入一句，保存后点它就能插入。",
+        clickToInsert: "点击插入到输入框",
+        inserted: "已插入到输入框",
+        appended: "已追加到输入框",
+        insertUnavailable: "在会话里打开这个面板才能插入",
+        insertFailed: "插入失败，请把光标放到输入框后重试",
+        errEmpty: "内容不能为空",
+        errTooLong: "内容不能超过 300 个字符",
+        errDuplicate: "这句已经存过了",
+        errTooMany: "最多保存 100 条",
+        errNotFound: "找不到这条口头禅",
+        errBadRequest: "请求格式不正确",
+        errStoreCorrupt: "存储文件不是合法 JSON，未加载",
+        errRead: "读取失败",
+        errSave: "保存失败",
+        errNoEndpoint: "没有可用的接口",
+      },
+      en: {
+        tabTitle: "Phrases",
+        guideTitle: "Phrases",
+        guideDescription: "The lines you say often — click to insert",
+        chip: "Phrases",
+        title: "Phrases",
+        refresh: "Refresh",
+        addPlaceholder: 'Add a line you say often, e.g. "On it — taking a look now."',
+        addAria: "New phrase",
+        save: "Save",
+        cancel: "Cancel",
+        insert: "Insert",
+        edit: "Edit",
+        delete: "Delete",
+        confirmDelete: "Delete",
+        hint: "Click a line to insert it; up to 100 lines, 300 characters each",
+        loading: "Loading…",
+        empty: "No phrases yet. Add one above, then click it to insert.",
+        clickToInsert: "Click to insert into the composer",
+        inserted: "Inserted into the composer",
+        appended: "Appended to the composer",
+        insertUnavailable: "Open this panel in a session to insert",
+        insertFailed: "Insert failed — click into the composer and retry",
+        errEmpty: "The phrase is empty",
+        errTooLong: "A phrase is limited to 300 characters",
+        errDuplicate: "That phrase is already saved",
+        errTooMany: "The list holds at most 100 phrases",
+        errNotFound: "That phrase no longer exists",
+        errBadRequest: "The request was malformed",
+        errStoreCorrupt: "The store file is not valid JSON; it was not loaded",
+        errRead: "Could not read the phrases",
+        errSave: "Could not save the phrase",
+        errNoEndpoint: "No usable endpoint answered",
+      },
+    };
+
+    /** Set by `apply`; returns the key itself until the locale service binds. */
+    let translate = (key) => key;
+    const localeListeners = new Set();
+
+    /** Re-render this component when the GUI language changes. */
+    function useT() {
+      const [, setRevision] = useState(0);
+      useEffect(() => {
+        const listener = () => setRevision((value) => value + 1);
+        localeListeners.add(listener);
+        return () => {
+          localeListeners.delete(listener);
+        };
+      }, []);
+      return translate;
+    }
 
     /* --------------------------------- data ---------------------------------- */
 
@@ -62,9 +152,16 @@ window.__ModuleLoader__.load({
       return [...new Set(candidates)];
     }
 
+    /** A refusal from the Host, normalized to a code the panel can translate. */
+    function failure(body, status, fallback) {
+      const code = body && typeof body.error === "string" ? body.error : fallback;
+      const detail = body && typeof body.path === "string" ? body.path : "";
+      return { ok: false, error: { code, status, detail } };
+    }
+
     async function readPhrases() {
       const tried = [];
-      for (const url of routeUrls("api/phrases")) {
+      for (const url of routeUrls("api/dsh-phrase")) {
         tried.push(url);
         try {
           const response = await fetch(url, { headers: { accept: "application/json" } });
@@ -75,19 +172,17 @@ window.__ModuleLoader__.load({
           } catch {
             continue;
           }
-          if (!response.ok) {
-            return { ok: false, error: body && body.error ? String(body.error) : `读取失败 (${response.status})` };
-          }
+          if (!response.ok) return failure(body, response.status, "read_failed");
           return { ok: true, body };
         } catch {
           // Try the next candidate.
         }
       }
-      return { ok: false, error: `没有可用的接口: ${tried.join(", ")}` };
+      return { ok: false, error: { code: "no_endpoint", status: 0, detail: tried.join(", ") } };
     }
 
     async function writePhrase(action) {
-      const candidates = routeUrls("api/phrases");
+      const candidates = routeUrls("api/dsh-phrase");
       const url = candidates.find((candidate) => candidate.startsWith(`${location.origin}/`)) ?? candidates[0];
       try {
         const response = await fetch(url, {
@@ -97,7 +192,7 @@ window.__ModuleLoader__.load({
             "content-type": "application/json",
             // Custom header + JSON body: both make a cross-origin page need a
             // preflight this server never answers.
-            "x-phrases-write": "1",
+            "x-dsh-phrase-write": "1",
           },
           body: JSON.stringify(action),
         });
@@ -108,17 +203,37 @@ window.__ModuleLoader__.load({
         } catch {
           body = null;
         }
-        if (!response.ok) {
-          return { ok: false, error: body && body.error ? String(body.error) : `保存失败 (${response.status})` };
-        }
+        if (!response.ok) return failure(body, response.status, "save_failed");
         return { ok: true, body };
       } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : String(error) };
+        return {
+          ok: false,
+          error: { code: "save_failed", status: 0, detail: error instanceof Error ? error.message : String(error) },
+        };
       }
     }
 
+    function errorText(t, error) {
+      const keys = {
+        empty: "errEmpty",
+        too_long: "errTooLong",
+        duplicate: "errDuplicate",
+        too_many: "errTooMany",
+        not_found: "errNotFound",
+        store_corrupt: "errStoreCorrupt",
+        read_failed: "errRead",
+        save_failed: "errSave",
+        no_endpoint: "errNoEndpoint",
+      };
+      const key = keys[error && error.code] ?? "errBadRequest";
+      let text = t(key);
+      if (error && typeof error.status === "number" && error.status > 0) text += ` (HTTP ${error.status})`;
+      if (error && error.detail) text += `: ${error.detail}`;
+      return text;
+    }
+
     function usePhrases() {
-      const [state, setState] = useState({ status: "loading", phrases: [], error: "" });
+      const [state, setState] = useState({ status: "loading", phrases: [], error: null });
       const [nonce, setNonce] = useState(0);
       const refresh = useCallback(() => setNonce((value) => value + 1), []);
       useEffect(() => {
@@ -130,13 +245,17 @@ window.__ModuleLoader__.load({
             return;
           }
           const phrases = Array.isArray(result.body?.phrases) ? result.body.phrases : [];
-          setState({ status: "ready", phrases, error: "" });
+          setState({ status: "ready", phrases, error: null });
         });
         return () => {
           alive = false;
         };
       }, [nonce]);
-      return { ...state, refresh, setPhrases: (phrases) => setState({ status: "ready", phrases, error: "" }) };
+      return {
+        ...state,
+        refresh,
+        setPhrases: (phrases) => setState({ status: "ready", phrases, error: null }),
+      };
     }
 
     /* -------------------------------- rendering ------------------------------- */
@@ -189,8 +308,20 @@ window.__ModuleLoader__.load({
     }
 
     function PhraseRow(props) {
-      const { phrase, editing, confirming, busy, onInsert, onStartEdit, onEditText, onSaveEdit, onCancel, onStartDelete, onConfirmDelete } =
-        props;
+      const {
+        t,
+        phrase,
+        editing,
+        confirming,
+        busy,
+        onInsert,
+        onStartEdit,
+        onEditText,
+        onSaveEdit,
+        onCancel,
+        onStartDelete,
+        onConfirmDelete,
+      } = props;
       const editingThis = editing !== null && editing.id === phrase.id;
       const confirmingThis = confirming === phrase.id;
 
@@ -232,8 +363,8 @@ window.__ModuleLoader__.load({
           h(
             "div",
             { style: { display: "flex", gap: 6 } },
-            button("保存", "保存修改", onSaveEdit, { disabled: busy, tone: "accent" }),
-            button("取消", "放弃修改", onCancel),
+            button(t("save"), t("save"), onSaveEdit, { disabled: busy, tone: "accent" }),
+            button(t("cancel"), t("cancel"), onCancel),
           ),
         );
       }
@@ -256,7 +387,7 @@ window.__ModuleLoader__.load({
         h(
           "div",
           {
-            title: "点击插入到输入框",
+            title: t("clickToInsert"),
             onClick: () => onInsert(phrase.text),
             style: {
               flex: "1 1 auto",
@@ -276,43 +407,44 @@ window.__ModuleLoader__.load({
           ? h(
               "div",
               { style: { display: "flex", gap: 4, flex: "0 0 auto" } },
-              button("删除", "确认删除", onConfirmDelete, { disabled: busy, tone: "danger" }),
-              button("取消", "保留", onCancel),
+              button(t("confirmDelete"), t("confirmDelete"), onConfirmDelete, { disabled: busy, tone: "danger" }),
+              button(t("cancel"), t("cancel"), onCancel),
             )
           : h(
               "div",
               { style: { display: "flex", gap: 4, flex: "0 0 auto" } },
-              button("插入", "插入到输入框", () => onInsert(phrase.text), { tone: "accent" }),
-              button("编辑", "修改这句", () => onStartEdit(phrase)),
-              button("删除", "删除这句", () => onStartDelete(phrase.id)),
+              button(t("insert"), t("clickToInsert"), () => onInsert(phrase.text), { tone: "accent" }),
+              button(t("edit"), t("edit"), () => onStartEdit(phrase)),
+              button(t("delete"), t("delete"), () => onStartDelete(phrase.id)),
             ),
       );
     }
 
     function PhrasesPanel(props = {}) {
+      const t = useT();
       const { status, phrases, error, refresh, setPhrases } = usePhrases();
       const [addText, setAddText] = useState("");
       const [editing, setEditing] = useState(null);
       const [confirming, setConfirming] = useState("");
-      const [notice, setNotice] = useState("");
+      const [notice, setNotice] = useState(null);
       const [busy, setBusy] = useState(false);
       // The host's selector hook over the composer draft. Called unconditionally:
       // the panel only mounts inside a Session, where the hook is present, but a
       // conditional hook call would still be a rules-of-hooks violation.
       const useDraft = typeof props.useInput === "function" ? props.useInput : () => "";
       const draft = useDraft((state) => (state && typeof state.draft === "string" ? state.draft : ""));
-      const actions = props.inputActions;
 
       const insert = useCallback(
         (text) => {
+          const actions = props.inputActions;
           if (actions === undefined) {
-            setNotice("在会话里打开这个面板才能插入");
+            setNotice({ key: "insertUnavailable" });
             return;
           }
           try {
             const span = actions.captureInsertion();
             if (actions.insertText(text, span)) {
-              setNotice("已插入到输入框");
+              setNotice({ key: "inserted" });
               return;
             }
           } catch {
@@ -320,24 +452,24 @@ window.__ModuleLoader__.load({
           }
           try {
             actions.setDraft(`${draft}${draft === "" ? "" : "\n"}${text}`);
-            setNotice("已追加到输入框");
+            setNotice({ key: "appended" });
           } catch {
-            setNotice("插入失败，请把光标放到输入框后重试");
+            setNotice({ key: "insertFailed" });
           }
         },
-        [actions, draft],
+        [props.inputActions, draft],
       );
 
       const save = useCallback(
         async (action) => {
-          if (busy) return;
+          if (busy) return false;
           setBusy(true);
-          setNotice("");
+          setNotice(null);
           const result = await writePhrase(action);
           setBusy(false);
           if (!result.ok) {
-            setNotice(result.error);
-            return;
+            setNotice({ error: result.error });
+            return false;
           }
           const next = Array.isArray(result.body?.phrases) ? result.body.phrases : [];
           setPhrases(next);
@@ -366,6 +498,13 @@ window.__ModuleLoader__.load({
         if (ok) setConfirming("");
       }, [confirming, save]);
 
+      const noticeText =
+        notice === null
+          ? ""
+          : notice.error
+            ? errorText(t, notice.error)
+            : t(notice.key);
+
       return h(
         "div",
         { style: { display: "flex", flexDirection: "column", height: "100%", minHeight: 0, color: T.text } },
@@ -382,7 +521,7 @@ window.__ModuleLoader__.load({
               flexWrap: "wrap",
             },
           },
-          h("span", { style: { fontWeight: 650, fontSize: 14, lineHeight: 1.2, letterSpacing: "-0.01em" } }, "口头禅"),
+          h("span", { style: { fontWeight: 650, fontSize: 14, lineHeight: 1.2, letterSpacing: "-0.01em" } }, t("title")),
           h(
             "span",
             {
@@ -400,7 +539,7 @@ window.__ModuleLoader__.load({
             String(phrases.length),
           ),
           h("span", { style: { flex: "1 1 auto" } }),
-          button("刷新", "重新读取", refresh),
+          button(t("refresh"), t("refresh"), refresh),
         ),
         h(
           "div",
@@ -418,8 +557,8 @@ window.__ModuleLoader__.load({
           h("textarea", {
             value: addText,
             rows: 2,
-            placeholder: "新增一句常说的话，比如：收到，我马上看。",
-            "aria-label": "新增口头禅",
+            placeholder: t("addPlaceholder"),
+            "aria-label": t("addAria"),
             onChange: (event) => setAddText(event.target.value),
             style: {
               width: "100%",
@@ -439,16 +578,16 @@ window.__ModuleLoader__.load({
           }),
           h(
             "div",
-            { style: { display: "flex", alignItems: "center", gap: 6 } },
-            button("保存", "保存这条口头禅", add, { disabled: busy || addText.trim() === "", tone: "accent" }),
+            { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } },
+            button(t("save"), t("save"), add, { disabled: busy || addText.trim() === "", tone: "accent" }),
             h(
               "span",
               { style: { fontWeight: 400, fontSize: 10.5, lineHeight: 1.4, color: T.caption } },
-              "点句子插入输入框；最多 100 条，每条 300 字",
+              t("hint"),
             ),
           ),
         ),
-        notice === ""
+        notice === null
           ? null
           : h(
               "div",
@@ -458,18 +597,22 @@ window.__ModuleLoader__.load({
                   fontWeight: 500,
                   fontSize: 11.5,
                   lineHeight: 1.4,
-                  color: notice === "已插入到输入框" || notice === "已追加到输入框" ? HUE : T.warn,
+                  color: notice.error ? T.warn : HUE,
                   borderBottom: `1px solid ${T.border1}`,
                   flex: "0 0 auto",
                 },
               },
-              notice,
+              noticeText,
             ),
         status === "loading"
-          ? h("div", { style: { padding: "18px 14px", fontWeight: 400, fontSize: 12, lineHeight: 1.5, color: T.text3 } }, "读取中…")
+          ? h("div", { style: { padding: "18px 14px", fontWeight: 400, fontSize: 12, lineHeight: 1.5, color: T.text3 } }, t("loading"))
           : null,
         status === "error"
-          ? h("div", { style: { padding: "16px 14px", fontWeight: 400, fontSize: 12, lineHeight: 1.5, color: T.warn } }, error)
+          ? h(
+              "div",
+              { style: { padding: "16px 14px", fontWeight: 400, fontSize: 12, lineHeight: 1.5, color: T.warn, overflowWrap: "anywhere" } },
+              errorText(t, error),
+            )
           : null,
         status === "ready"
           ? h(
@@ -490,11 +633,12 @@ window.__ModuleLoader__.load({
                 ? h(
                     "div",
                     { style: { fontWeight: 400, fontSize: 12, lineHeight: 1.5, color: T.caption, padding: "4px 2px" } },
-                    "还没有保存的口头禅。上面输入一句，保存后点它就能插入。",
+                    t("empty"),
                   )
                 : phrases.map((phrase) =>
                     h(PhraseRow, {
                       key: phrase.id,
+                      t,
                       phrase,
                       editing,
                       confirming,
@@ -523,11 +667,12 @@ window.__ModuleLoader__.load({
     }
 
     function PhrasesChip() {
+      const t = useT();
       const open = useCallback(() => {
         try {
           ctxRef.current.sidebarRight.openTab(TAB_KIND);
         } catch (error) {
-          console.warn("[phrases] could not open the phrases panel", error);
+          console.warn("[dsh-phrase] could not open the phrases panel", error);
         }
       }, []);
       return h(
@@ -535,7 +680,7 @@ window.__ModuleLoader__.load({
         {
           type: "button",
           onClick: open,
-          title: "打开口头禅面板",
+          title: t("chip"),
           style: {
             display: "inline-flex",
             alignItems: "center",
@@ -552,25 +697,36 @@ window.__ModuleLoader__.load({
             cursor: "pointer",
           },
         },
-        h("span", { style: { color: T.text2 } }, "口头禅"),
+        h("span", { style: { color: T.text2 } }, t("chip")),
       );
     }
 
     return {
-      inject: ["slots", "sidebarRight", "sidebarRightTabs"],
+      inject: ["slots", "sidebarRight", "sidebarRightTabs", "locale"],
       apply(ctx) {
         ctxRef.current = ctx;
+        ctx.effect(() => ctx.locale.register(NS, DICTS), "dsh-phrase: dictionaries");
+        ctx.effect(() => {
+          translate = ctx.locale.bind(NS);
+          const off = ctx.locale.subscribe(() => {
+            for (const listener of localeListeners) listener();
+          });
+          return () => {
+            off();
+            translate = (key) => key;
+          };
+        }, "dsh-phrase: locale binding");
         ctx.effect(() =>
           ctx.sidebarRightTabs.register({
             id: TAB_ID,
             kind: TAB_KIND,
-            title: () => "口头禅",
+            title: () => translate("tabTitle"),
             guide: [
               {
-                id: "phrases-panel",
+                id: "dsh-phrase-panel",
                 order: 62,
-                title: () => "口头禅",
-                description: () => "常说的话，点击插入输入框",
+                title: () => translate("guideTitle"),
+                description: () => translate("guideDescription"),
                 icon: PhraseGlyph,
               },
             ],
@@ -583,7 +739,7 @@ window.__ModuleLoader__.load({
         );
         ctx.effect(() =>
           ctx.slots.inject("conversation.composer.dock", () =>
-            ctx.slots.register({ name: "conversation.composer.dock", id: "phrases-chip", order: 22 }, PhrasesChip),
+            ctx.slots.register({ name: "conversation.composer.dock", id: "dsh-phrase-chip", order: 22 }, PhrasesChip),
           ),
         );
       },

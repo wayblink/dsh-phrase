@@ -25,7 +25,7 @@ async function mount() {
   };
   const { apply } = await import("../index.js");
   apply(context);
-  const handler = routes.get("/api/phrases")?.handler;
+  const handler = routes.get("/api/dsh-phrase")?.handler;
   assert.equal(typeof handler, "function", "the phrases route must register");
 
   const call = async ({ method = "GET", headers = {}, body = "" } = {}) => {
@@ -67,7 +67,7 @@ async function mount() {
   return { home, call, cleanup };
 }
 
-const jsonHeaders = { "content-type": "application/json", "x-phrases-write": "1", host: "localhost" };
+const jsonHeaders = { "content-type": "application/json", "x-dsh-phrase-write": "1", host: "localhost" };
 
 test("the list starts empty and an add round-trips through the file", async (t) => {
   const { home, call, cleanup } = await mount();
@@ -86,7 +86,7 @@ test("the list starts empty and an add round-trips through the file", async (t) 
   assert.equal(added.json.phrases.length, 1);
   assert.equal(added.json.phrases[0].text, "收到，我马上看");
 
-  const disk = JSON.parse(await readFile(join(home, "phrases.json"), "utf8"));
+  const disk = JSON.parse(await readFile(join(home, "dsh-phrase.json"), "utf8"));
   assert.equal(disk.phrases[0].text, "收到，我马上看");
 
   const after = await call({});
@@ -104,11 +104,11 @@ test("duplicates and empty phrases are refused with a message", async (t) => {
     body: JSON.stringify({ action: "add", text: "好的" }),
   });
   assert.equal(duplicate.status, 400);
-  assert.equal(duplicate.json.error, "这句已经存过了");
+  assert.equal(duplicate.json.error, "duplicate");
 
   const empty = await call({ method: "POST", headers: jsonHeaders, body: JSON.stringify({ action: "add", text: " " }) });
   assert.equal(empty.status, 400);
-  assert.equal(empty.json.error, "内容不能为空");
+  assert.equal(empty.json.error, "empty");
 });
 
 test("update and delete go through one action each", async (t) => {
@@ -152,7 +152,7 @@ test("the write route refuses a missing header, a wrong type and a foreign origi
 
   const wrongType = await call({
     method: "POST",
-    headers: { "content-type": "text/plain", "x-phrases-write": "1", host: "localhost" },
+    headers: { "content-type": "text/plain", "x-dsh-phrase-write": "1", host: "localhost" },
     body: JSON.stringify({ action: "add", text: "x" }),
   });
   assert.equal(wrongType.status, 415);
@@ -168,9 +168,9 @@ test("the write route refuses a missing header, a wrong type and a foreign origi
 test("a malformed store file is reported instead of silently emptied", async (t) => {
   const { home, call, cleanup } = await mount();
   t.after(cleanup);
-  await writeFile(join(home, "phrases.json"), "{not json", "utf8");
+  await writeFile(join(home, "dsh-phrase.json"), "{not json", "utf8");
 
   const response = await call({});
   assert.equal(response.status, 500);
-  assert.match(response.json.error, /不是合法 JSON/);
+  assert.equal(response.json.error, "store_corrupt");
 });

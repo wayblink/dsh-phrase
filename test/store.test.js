@@ -22,15 +22,15 @@ test("an added phrase is trimmed and stamped", () => {
 });
 
 test("empty, oversized and duplicate phrases are refused", () => {
-  assert.equal(applyAction(empty, { action: "add", text: "   " }).error, "内容不能为空");
-  assert.match(applyAction(empty, { action: "add", text: "x".repeat(MAX_TEXT_LENGTH + 1) }).error, /不能超过/);
+  assert.equal(applyAction(empty, { action: "add", text: "   " }).error, "empty");
+  assert.equal(applyAction(empty, { action: "add", text: "x".repeat(MAX_TEXT_LENGTH + 1) }).error, "too_long");
   const existing = withPhrases("好的");
-  assert.equal(applyAction(existing, { action: "add", text: "好的" }).error, "这句已经存过了");
+  assert.equal(applyAction(existing, { action: "add", text: "好的" }).error, "duplicate");
 });
 
 test("the list is capped", () => {
   const full = withPhrases(...Array.from({ length: MAX_PHRASES }, (_, i) => `第 ${i + 1} 句`));
-  assert.match(applyAction(full, { action: "add", text: "多一句" }).error, /最多保存/);
+  assert.equal(applyAction(full, { action: "add", text: "多一句" }).error, "too_many");
 });
 
 test("update rewrites one phrase and preserves its identity", () => {
@@ -44,20 +44,20 @@ test("update rewrites one phrase and preserves its identity", () => {
 
 test("update refuses an unknown id, an empty body and a duplicate", () => {
   const state = withPhrases("A", "B");
-  assert.equal(applyAction(state, { action: "update", id: "nope", text: "C" }).error, "找不到这条口头禅");
-  assert.equal(applyAction(state, { action: "update", id: "p_1", text: "  " }).error, "内容不能为空");
-  assert.equal(applyAction(state, { action: "update", id: "p_1", text: "B" }).error, "这句已经存过了");
+  assert.equal(applyAction(state, { action: "update", id: "nope", text: "C" }).error, "not_found");
+  assert.equal(applyAction(state, { action: "update", id: "p_1", text: "  " }).error, "empty");
+  assert.equal(applyAction(state, { action: "update", id: "p_1", text: "B" }).error, "duplicate");
 });
 
 test("delete removes one phrase and refuses an unknown id", () => {
   const result = applyAction(withPhrases("A", "B"), { action: "delete", id: "p_1" });
   assert.deepEqual(result.state.phrases.map((row) => row.text), ["B"]);
-  assert.equal(applyAction(withPhrases("A"), { action: "delete", id: "nope" }).error, "找不到这条口头禅");
+  assert.equal(applyAction(withPhrases("A"), { action: "delete", id: "nope" }).error, "not_found");
 });
 
 test("an unknown action is an error, not a silent no-op", () => {
-  assert.match(applyAction(empty, { action: "explode" }).error, /未知操作/);
-  assert.match(applyAction(empty, {}).error, /未知操作/);
+  assert.equal(applyAction(empty, { action: "explode" }).error, "unknown_action");
+  assert.equal(applyAction(empty, {}).error, "unknown_action");
 });
 
 test("normalizeState drops junk, duplicates and over-cap rows", () => {

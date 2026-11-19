@@ -1,6 +1,6 @@
-# Canned phrases for the composer: one Host route over <DSH_HOME>/phrases.json
+# Canned phrases for the composer: one Host route over <DSH_HOME>/dsh-phrase.json
 # and one right-Sidebar panel. No model tools are registered.
 - insert:
-    - id: phrases
-      name: '@wayblink/phrases-dsh'
+    - id: dsh-phrase
+      name: 'dsh-phrase'
       config: {}

@@ -10,13 +10,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 /**
  * Mount the browser module against a stub context and fake hook values.
  *
- * Function components are expanded in place; the panel and its rows have no
- * hooks of their own beyond the hook-value cursor the stub feeds.
+ * The locale stub behaves like the real service for the two things this module
+ * uses: `register` keeps the dictionaries, `bind` resolves the active language.
+ * `language` picks which dictionary the panel reads.
  */
-function mount(hookValues = []) {
+function mount(hookValues = [], language = "zh") {
   const tabs = [];
   const slots = new Map();
   const opened = [];
+  const dictionaries = {};
   const context = {
     effect: (fn) => {
       const disposer = fn();
@@ -38,6 +40,18 @@ function mount(hookValues = []) {
     sidebarRight: {
       openTab(kind) {
         opened.push(kind);
+      },
+    },
+    locale: {
+      register(ns, dicts) {
+        dictionaries[ns] = dicts;
+        return () => {};
+      },
+      bind(ns) {
+        return (key) => (dictionaries[ns]?.[language]?.[key] ?? key);
+      },
+      subscribe() {
+        return () => {};
       },
     },
   };
@@ -103,26 +117,29 @@ const READY = {
     { id: "p_1", text: "收到，我马上看", createdAt: "2026-11-19T00:00:00.000Z" },
     { id: "p_2", text: "这个我晚点回复你", createdAt: "2026-11-19T00:00:01.000Z" },
   ],
-  error: "",
+  error: null,
 };
+
+/** Hook order: useT, usePhrases(state), usePhrases(nonce), addText, editing, confirming, notice, busy. */
+const PANEL_HOOKS = [0, READY, 0, "", null, "", null, false];
 
 test("the panel, the composer chip and the guide entry register", () => {
   const { tabs, slots } = mount();
   assert.equal(tabs.length, 1);
   const definition = tabs[0];
-  assert.equal(definition.kind, "phrases");
+  assert.equal(definition.kind, "dsh-phrase");
   assert.equal(definition.title(""), "口头禅");
   assert.ok(Array.isArray(definition.guide) && definition.guide.length === 1);
   assert.equal(definition.guide[0].title(""), "口头禅");
 
   const keys = [...slots.keys()];
-  assert.ok(keys.includes(`sidebar.right.pane.tab:${definition.id}`), "the panel body must register");
-  assert.ok(keys.includes("conversation.composer.dock:phrases-chip"), "the chip must register");
+  assert.ok(keys.includes("sidebar.right.pane.tab:dsh-phrase/panel"), "the panel body must register");
+  assert.ok(keys.includes("conversation.composer.dock:dsh-phrase-chip"), "the chip must register");
 });
 
 test("the panel renders the stored phrases with insert, edit and delete", () => {
-  const { slots } = mount([READY, 0, "", null, "", "", false]);
-  const panel = slots.get("sidebar.right.pane.tab:@wayblink/phrases-dsh/panel");
+  const { slots } = mount(PANEL_HOOKS);
+  const panel = slots.get("sidebar.right.pane.tab:dsh-phrase/panel");
   const tree = expand(panel({ inputActions: undefined, useInput: () => "" }));
   const text = JSON.stringify(tree);
 
@@ -132,6 +149,21 @@ test("the panel renders the stored phrases with insert, edit and delete", () => 
   assert.ok(text.includes("插入"));
   assert.ok(text.includes("编辑"));
   assert.ok(text.includes("删除"));
+  assert.ok(text.includes("新增一句常说的话"), "the add prompt must be localized");
+});
+
+test("the panel follows the English dictionary", () => {
+  const { tabs, slots } = mount(PANEL_HOOKS, "en");
+  assert.equal(tabs[0].title(""), "Phrases");
+  const panel = slots.get("sidebar.right.pane.tab:dsh-phrase/panel");
+  const tree = expand(panel({ inputActions: undefined, useInput: () => "" }));
+  const text = JSON.stringify(tree);
+
+  assert.ok(text.includes("Phrases"));
+  assert.ok(text.includes("Insert"));
+  assert.ok(text.includes("Edit"));
+  assert.ok(text.includes("Delete"));
+  assert.ok(!text.includes("口头禅"), "no Chinese label should leak into the English UI");
 });
 
 test("clicking a phrase inserts it through the composer actions", () => {
@@ -144,10 +176,10 @@ test("clicking a phrase inserts it through the composer actions", () => {
     },
     setDraft: () => {},
   };
-  const { slots } = mount([READY, 0, "", null, "", "", false]);
-  const panel = slots.get("sidebar.right.pane.tab:@wayblink/phrases-dsh/panel");
+  const { slots } = mount(PANEL_HOOKS);
+  const panel = slots.get("sidebar.right.pane.tab:dsh-phrase/panel");
   const tree = expand(panel({ inputActions: actions, useInput: (selector) => selector({ draft: "草稿" }) }));
-  const insertButton = find(tree, (el) => el.type === "button" && el.props?.title === "插入到输入框");
+  const insertButton = find(tree, (el) => el.type === "button" && el.props?.title === "点击插入到输入框");
   assert.ok(insertButton !== null, "the insert control must render");
   insertButton.props.onClick({ stopPropagation() {} });
 
@@ -155,12 +187,12 @@ test("clicking a phrase inserts it through the composer actions", () => {
 });
 
 test("without composer actions the panel explains instead of throwing", () => {
-  const { slots } = mount([READY, 0, "", null, "", "", false]);
-  const panel = slots.get("sidebar.right.pane.tab:@wayblink/phrases-dsh/panel");
+  const { slots } = mount(PANEL_HOOKS);
+  const panel = slots.get("sidebar.right.pane.tab:dsh-phrase/panel");
   const tree = expand(panel({ inputActions: undefined, useInput: () => "" }));
-  const insertButton = find(tree, (el) => el.type === "button" && el.props?.title === "插入到输入框");
+  const insertButton = find(tree, (el) => el.type === "button" && el.props?.title === "点击插入到输入框");
   insertButton.props.onClick({ stopPropagation() {} });
-  // The notice is set through the stubbed setState, so the tree cannot show it;
-  // the point is that the handler does not throw and tolerates the absence.
+  // The notice is state, not tree; the point is that the handler tolerates the
+  // absence of the composer actions without throwing.
   assert.ok(true);
 });
