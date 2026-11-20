@@ -4,10 +4,11 @@
 
 ## English
 
-Save the lines you type often, then insert them into the composer with one click. The right-Sidebar **Phrases** tab lists them; the composer chip opens the same tab.
+Save the lines you type often, then insert them into the composer with one click. Three entry points share one list: the right-Sidebar **Phrases** tab (add, edit, delete), and one **Phrases** chip in the composer tool row — right after the permission control, on the New Session page and in a running Session alike — that opens a one-click dropdown of the same list.
 
 ### Using it
 
+- Click the **Phrases** chip in the composer tool row and pick a line — it goes into the composer at the caret. **Manage** in that dropdown opens the panel. The chip needs a Session, so a window with no Session at all has no chip.
 - Type a line in the box at the top of the panel and press **Save**. Up to 100 lines, 300 characters each; empty, oversized and duplicate lines are refused.
 - Click the line (or **Insert**) to put it into the current Session's composer at the caret. If the editor refuses (locked, or the draft revision moved), the plugin appends it to the current draft instead.
 - **Edit** rewrites a line in place; **Delete** asks once before removing it. **Refresh** re-reads the Host store.
@@ -28,15 +29,17 @@ The plugin registers no model tools; phrases stay local until you insert one and
 
 ### Limitations
 
-- The panel only mounts inside a Session; opening it from a session-less page shows a hint instead of inserting.
+- The chip and the panel both need a Session; a window with no Session at all renders no chip, and the panel shows a hint instead of inserting.
+- The chip sits in the composer tool row, which the host hides while the activity panel is expanded; the right-Sidebar tab stays reachable.
 - One hundred lines and 300 characters per line are fixed bounds, not settings.
 
 ## 中文
 
-把经常输入的那几句话存起来，在右侧「口头禅」面板里点一下，就插入当前会话的输入框。
+把经常输入的那几句话存起来，在右侧「口头禅」面板里点一下，就插入当前会话的输入框。三个入口共用一份列表：右侧栏面板（增删改），以及输入框那一行权限控件右边的「口头禅」chip（新会话页和已有会话同位置）。chip 点开就是列表，一句一点直接进输入框，里面的「管理」打开面板。
 
 ### 用法
 
+- 点输入框控件行（权限控件右边）的「口头禅」chip，选一句直接进输入框；下拉里的「管理」打开右侧面板。这个 chip 需要已有会话——完全没有会话的冷启动页没有它。
 - 面板顶部输入一句话，点「保存」。最多 100 条、每条 300 字；空内容、超长和重复内容会被拒绝。
 - 点句子本身或「插入」按钮，插入到输入框光标处；编辑器锁定或草稿版本变化时，退化为追加到当前草稿末尾。
 - 「编辑」原地改文字；「删除」需要再点一次确认；「刷新」重新读取 Host 上的列表。
@@ -57,5 +60,6 @@ The plugin registers no model tools; phrases stay local until you insert one and
 
 ### 限制
 
-- 面板只在会话内可用；在没有会话的页面打开时只提示、不插入。
+- chip 和面板都需要会话；完全没有会话时 chip 不渲染，面板只提示、不插入。
+- chip 在输入框控件行里，宿主展开活动面板（activity）时会连带隐藏这一行；此时用右侧栏面板。
 - 100 条、每条 300 字是固定上限，不提供设置项。

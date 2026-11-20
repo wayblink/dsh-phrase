@@ -65,6 +65,8 @@ function mount(hookValues = [], language = "zh") {
     },
     useEffect: () => {},
     useCallback: (fn) => fn,
+    useRef: () => ({ current: null }),
+    Fragment: "fragment",
   };
   const sandbox = {
     window: {
@@ -134,7 +136,36 @@ test("the panel, the composer chip and the guide entry register", () => {
 
   const keys = [...slots.keys()];
   assert.ok(keys.includes("sidebar.right.pane.tab:dsh-phrase/panel"), "the panel body must register");
-  assert.ok(keys.includes("conversation.composer.dock:dsh-phrase-chip"), "the chip must register");
+  assert.ok(keys.includes("conversation.input.left:dsh-phrase-chip"), "the composer tool-row chip must register");
+  assert.ok(keys.includes("shell.overlay:dsh-phrase-menu"), "the dropdown layer must register");
+  assert.ok(
+    !keys.some(key => key.startsWith("conversation.hero.options")),
+    "the chip lives in the tool row only, so the New Session page cannot show it twice",
+  );
+});
+
+/** Hook order for the chip: useT, useHeroMenu, usePhrases(state), usePhrases(nonce). */
+const CHIP_HOOKS = [0, 0, READY, 0];
+
+test("the composer chip opens the dropdown and keeps the caret", () => {
+  const mounted = mount(CHIP_HOOKS);
+  const chip = mounted.slots.get("conversation.input.left:dsh-phrase-chip");
+  const tree = expand(chip({ inputActions: undefined, useInput: () => "" }));
+  const button = find(tree, (el) => el.type === "button");
+
+  assert.ok(button !== null, "the chip must render a button");
+  assert.ok("data-phrase-chip" in button.props, "the chip carries the marker the dropdown keeps clicks inside");
+  assert.equal(button.props["aria-expanded"], false);
+  assert.equal(button.props["aria-controls"], "dsh-phrase-menu");
+
+  // Pressing must not move focus into the chip: the composer keeps the caret
+  // that `captureInsertion` reads, so the phrase lands where it was typed.
+  let prevented = false;
+  button.props.onMouseDown({ preventDefault: () => { prevented = true; } });
+  assert.ok(prevented, "mousedown must be prevented");
+
+  button.props.onClick({ detail: 1 });
+  assert.deepEqual(mounted.opened, [], "the chip must not open the Sidebar tab any more");
 });
 
 test("the panel renders the stored phrases with insert, edit and delete", () => {

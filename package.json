@@ -1,6 +1,6 @@
 {
   "name": "dsh-phrase",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DeepSeek Harness plugin for canned phrases: save the lines you type often and insert them into the composer with one click. Bilingual UI (English / 中文).",
   "license": "MIT",
   "type": "module",
